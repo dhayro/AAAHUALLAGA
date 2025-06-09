@@ -5,7 +5,7 @@ import {
   TablePagination, InputAdornment
 } from '@mui/material';
 import { styled } from '@mui/material/styles';
-import api from '../services/api';
+import { getTiposDocumentos, createTipoDocumento, updateTipoDocumento, deleteTipoDocumento } from '../services/api';
 import Swal from 'sweetalert2';
 import SearchIcon from '@mui/icons-material/Search';
 import { debounce } from 'lodash';
@@ -98,12 +98,12 @@ const isEqual = (obj1, obj2) => {
   return JSON.stringify(obj1) === JSON.stringify(obj2);
 };
 
-const Cargos = () => {
+const TiposDocumentos = () => {
   const nombreInputRef = useRef(null);
 
-  const [cargos, setCargos] = useState([]);
+  const [tiposDocumentos, setTiposDocumentos] = useState([]);
   const [open, setOpen] = useState(false);
-  const [currentCargo, setCurrentCargo] = useState({ nombre: '', descripcion: '' });
+  const [currentTipoDocumento, setCurrentTipoDocumento] = useState({ nombre: '', descripcion: '' });
   const [isEditing, setIsEditing] = useState(false);
   const [pagination, setPagination] = useState({
     pageIndex: 0,
@@ -135,47 +135,45 @@ const Cargos = () => {
     }, 3000);
   }, []);
 
-  const fetchPaginatedCargos = useCallback(async (currentFilters, currentPagination) => {
-    console.log('Fetching with filters:', currentFilters, 'and pagination:', currentPagination);
+  const fetchPaginatedTiposDocumentos = useCallback(async (currentFilters, currentPagination) => {
     setIsLoading(true);
     try {
-      const response = await api.get('/cargos', {
-        params: {
-          page: currentPagination.pageIndex + 1,
-          limit: currentPagination.pageSize,
-          nombre: currentFilters.nombre,
-          descripcion: currentFilters.descripcion,
-          filtro: currentFilters.filtro,
-        },
+      console.log('Fetching tipos de documentos with filters:', currentFilters, 'and pagination:', currentPagination);
+      const response = await getTiposDocumentos({
+        page: currentPagination.pageIndex + 1,
+        limit: currentPagination.pageSize,
+        nombre: currentFilters.nombre,
+        descripcion: currentFilters.descripcion,
+        filtro: currentFilters.filtro,
       });
-      if (response.data && response.data.cargos) {
-        setCargos(response.data.cargos);
-        setTotalCount(response.data.totalCargos);
+      console.log('API response:', response.data);
+      if (response.data && response.data.tiposDocumento) {
+        setTiposDocumentos(response.data.tiposDocumento);
+        setTotalCount(response.data.totalTiposDocumento);
       } else {
         console.error('Unexpected response format:', response.data);
         showErrorAlert('Formato de respuesta inesperado del servidor.');
       }
     } catch (error) {
-      console.error('Error fetching cargos:', error);
-      showErrorAlert('Error al cargar los cargos. Por favor, intente de nuevo más tarde.');
+      console.error('Error fetching tipos de documentos:', error);
+      showErrorAlert('Error al cargar los tipos de documentos. Por favor, intente de nuevo más tarde.');
     } finally {
       setIsLoading(false);
     }
   }, [showErrorAlert]);
 
-  const debouncedFetchCargos = useRef(
+  const debouncedFetchTiposDocumentos = useRef(
     debounce((newFilters, newPagination) => {
-      fetchPaginatedCargos(newFilters, newPagination);
+      fetchPaginatedTiposDocumentos(newFilters, newPagination);
     }, 300)
   ).current;
 
   useEffect(() => {
-    debouncedFetchCargos(filters, pagination);
-  }, [filters, pagination, debouncedFetchCargos]);
+    debouncedFetchTiposDocumentos(filters, pagination);
+  }, [filters, pagination, debouncedFetchTiposDocumentos]);
 
   useEffect(() => {
     if (open) {
-      // Usamos setTimeout para asegurarnos de que el modal esté completamente renderizado
       setTimeout(() => {
         if (nombreInputRef.current) {
           nombreInputRef.current.focus();
@@ -184,24 +182,8 @@ const Cargos = () => {
     }
   }, [open]);
 
-  useEffect(() => {
-    // Aplicar estilos para SweetAlert
-    const style = document.createElement('style');
-    style.textContent = `
-      .my-swal {
-        z-index: 9999;
-      }
-    `;
-    document.head.appendChild(style);
-
-    // Limpiar el estilo cuando el componente se desmonte
-    return () => {
-      document.head.removeChild(style);
-    };
-  }, []);
-
   const handleOpen = () => {
-    setCurrentCargo({ nombre: '', descripcion: '' });
+    setCurrentTipoDocumento({ nombre: '', descripcion: '' });
     setIsEditing(false);
     setOpen(true);
     setNombreError(false);
@@ -213,7 +195,7 @@ const Cargos = () => {
   };
 
   const handleInputChange = (e) => {
-    setCurrentCargo({ ...currentCargo, [e.target.name]: e.target.value });
+    setCurrentTipoDocumento({ ...currentTipoDocumento, [e.target.name]: e.target.value });
     if (e.target.name === 'nombre') {
       setNombreError(false);
     }
@@ -221,26 +203,25 @@ const Cargos = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!currentCargo.nombre.trim()) {
+    if (!currentTipoDocumento.nombre.trim()) {
       setNombreError(true);
       nombreInputRef.current.focus();
-      showErrorAlert('El nombre del cargo no puede estar vacío.');
+      showErrorAlert('El nombre del tipo de documento no puede estar vacío.');
       return;
     }
 
-    const cargoEnMayusculas = {
-      ...currentCargo,
-      nombre: currentCargo.nombre.trim().toUpperCase(),
-      // descripcion: currentCargo.descripcion.trim().toUpperCase()
+    const tipoDocumentoEnMayusculas = {
+      ...currentTipoDocumento,
+      nombre: currentTipoDocumento.nombre.trim().toUpperCase(),
     };
 
     if (isEditing) {
-      const cargoOriginal = cargos.find(cargo => cargo.id === cargoEnMayusculas.id);
-      if (isEqual(cargoOriginal, cargoEnMayusculas)) {
+      const tipoDocumentoOriginal = tiposDocumentos.find(tipo => tipo.id === tipoDocumentoEnMayusculas.id);
+      if (isEqual(tipoDocumentoOriginal, tipoDocumentoEnMayusculas)) {
         showSweetAlert({
           icon: 'info',
           title: 'Sin cambios',
-          text: 'No se han realizado cambios en el cargo.',
+          text: 'No se han realizado cambios en el tipo de documento.',
           timer: 2500,
           timerProgressBar: true,
           showConfirmButton: false
@@ -251,29 +232,24 @@ const Cargos = () => {
     }
 
     try {
-      let response;
       if (isEditing) {
-        response = await api.put(`/cargos/${cargoEnMayusculas.id}`, cargoEnMayusculas);
+        await updateTipoDocumento(tipoDocumentoEnMayusculas.id, tipoDocumentoEnMayusculas);
       } else {
-        response = await api.post('/cargos', cargoEnMayusculas);
+        await createTipoDocumento(tipoDocumentoEnMayusculas);
       }
 
-      if (response.status === 200 || response.status === 201) {
-        fetchPaginatedCargos(filters, pagination);
-        handleClose();
-        showSweetAlert({
-          icon: 'success',
-          title: 'Éxito',
-          text: isEditing ? 'Cargo actualizado correctamente' : 'Cargo agregado correctamente',
-          timer: 2500,
-          timerProgressBar: true,
-          showConfirmButton: false
-        });
-      } else {
-        throw new Error(response.data.mensaje || 'Error al procesar la solicitud');
-      }
+      fetchPaginatedTiposDocumentos(filters, pagination);
+      handleClose();
+      showSweetAlert({
+        icon: 'success',
+        title: 'Éxito',
+        text: isEditing ? 'Tipo de documento actualizado correctamente' : 'Tipo de documento agregado correctamente',
+        timer: 2500,
+        timerProgressBar: true,
+        showConfirmButton: false
+      });
     } catch (error) {
-      console.error('Error submitting cargo:', error);
+      console.error('Error submitting tipo de documento:', error);
       let errorMessage = 'Error al procesar la solicitud. Por favor, intente de nuevo.';
       if (error.response) {
         console.error('Error response:', error.response.data);
@@ -296,61 +272,51 @@ const Cargos = () => {
     }
   };
 
-  const handleEdit = (cargo) => {
-    setCurrentCargo(cargo);
+  const handleEdit = (tipoDocumento) => {
+    setCurrentTipoDocumento(tipoDocumento);
     setIsEditing(true);
     setOpen(true);
   };
 
   const handleDelete = async (id) => {
-  try {
-    const result = await showSweetAlert({
-      title: '¿Está seguro?',
-      text: "No podrá revertir esta acción",
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonColor: '#3085d6',
-      cancelButtonColor: '#d33',
-      confirmButtonText: 'Sí, eliminar',
-      cancelButtonText: 'Cancelar'
-    });
+    try {
+      const result = await showSweetAlert({
+        title: '¿Está seguro?',
+        text: "No podrá revertir esta acción",
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#3085d6',
+        cancelButtonColor: '#d33',
+        confirmButtonText: 'Sí, eliminar',
+        cancelButtonText: 'Cancelar'
+      });
 
-    if (result.isConfirmed) {
-      await api.delete(`/cargos/${id}`);
-      fetchPaginatedCargos(filters, pagination);
+      if (result.isConfirmed) {
+        await deleteTipoDocumento(id);
+        fetchPaginatedTiposDocumentos(filters, pagination);
 
+        showSweetAlert({
+          icon: 'success',
+          title: 'Eliminado',
+          text: 'El tipo de documento ha sido eliminado.',
+          timer: 2500,
+          timerProgressBar: true,
+          showConfirmButton: false
+        });
+      }
+    } catch (error) {
+      console.error('Error deleting tipo de documento:', error);
+      let errorMessage = 'Error al procesar la solicitud. Por favor, intente de nuevo.';
       showSweetAlert({
-        icon: 'success',
-        title: 'Eliminado',
-        text: 'El cargo ha sido eliminado.',
-        timer: 2500,
+        icon: 'error',
+        title: 'Error',
+        text: "No se pudo eliminar el tipo de documento. " + errorMessage,
+        timer: 3000,
         timerProgressBar: true,
         showConfirmButton: false
       });
     }
-  } catch (error) {
-    console.error('Error deleting cargo:', error);
-    let errorMessage = 'Error al procesar la solicitud. Por favor, intente de nuevo.';
-    // if (error.response) {
-    //   console.error('Error response:', error.response.data);
-    //   console.error('Error status:', error.response.status);
-    //   errorMessage = error.response.data.mensaje || errorMessage;
-    // } else if (error.request) {
-    //   console.error('Error request:', error.request);
-    //   errorMessage = 'No se recibió respuesta del servidor. Por favor, verifique su conexión.';
-    // } else {
-    //   console.error('Error message:', error.message);
-    // }
-    showSweetAlert({
-      icon: 'error',
-      title: 'Error',
-      text: "No se pudo eliminar el cargo. " + errorMessage,
-      timer: 3000,
-      timerProgressBar: true,
-      showConfirmButton: false
-    });
-  }
-};
+  };
 
   const handleChangePage = (event, newPage) => {
     setPagination(old => ({ ...old, pageIndex: newPage }));
@@ -367,17 +333,16 @@ const Cargos = () => {
       ...prevFilters,
       [name]: value
     }));
-    setPagination(prev => ({ ...prev, pageIndex: 0 })); // Reset to first page when filter changes
+    setPagination(prev => ({ ...prev, pageIndex: 0 }));
   };
 
   return (
     <div>
-      <h2>Gestión de Cargos</h2>
+      <h2>Gestión de Tipos de Documentos</h2>
       <BootstrapButton variant="contained" color="primary" onClick={handleOpen} style={{ marginBottom: '1rem' }}>
-        Agregar Nuevo Cargo
+        Agregar Nuevo Tipo de Documento
       </BootstrapButton>
       
-      {/* Filtro filtro */}
       <TextField
         name="filtro"
         value={filters.filtro}
@@ -434,24 +399,24 @@ const Cargos = () => {
               <TableRow>
                 <TableCell colSpan={4} align="center">Cargando...</TableCell>
               </TableRow>
-            ) : cargos.length > 0 ? (
-              cargos.map((cargo, index) => (
+            ) : tiposDocumentos.length > 0 ? (
+              tiposDocumentos.map((tipo, index) => (
                 <StyledTableRow
-                  key={cargo.id}
+                  key={tipo.id}
                   tabIndex={0}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') {
-                      handleEdit(cargo);
+                      handleEdit(tipo);
                     }
                   }}
                 >
                   <TableCell>{pagination.pageIndex * pagination.pageSize + index + 1}</TableCell>
-                  <TableCell>{cargo.nombre || ''}</TableCell>
-                  <TableCell>{cargo.descripcion || ''}</TableCell>
+                  <TableCell>{tipo.nombre || ''}</TableCell>
+                  <TableCell>{tipo.descripcion || ''}</TableCell>
                   <TableCell align="right">
                     <BootstrapButton
                       color="success"
-                      onClick={() => handleEdit(cargo)}
+                      onClick={() => handleEdit(tipo)}
                       style={{ marginRight: '8px', padding: '4px 8px' }}
                       size="small"
                     >
@@ -459,7 +424,7 @@ const Cargos = () => {
                     </BootstrapButton>
                     <BootstrapButton
                       color="secondary"
-                      onClick={() => handleDelete(cargo.id)}
+                      onClick={() => handleDelete(tipo.id)}
                       style={{ padding: '4px 8px' }}
                       size="small"
                     >
@@ -470,7 +435,7 @@ const Cargos = () => {
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={4} align="center">No hay cargos disponibles</TableCell>
+                <TableCell colSpan={4} align="center">No hay tipos de documentos disponibles</TableCell>
               </TableRow>
             )}
           </TableBody>
@@ -494,7 +459,7 @@ const Cargos = () => {
         aria-labelledby="dialog-title"
       >
         <form onSubmit={handleSubmit}>
-          <DialogTitle id="dialog-title">{isEditing ? 'Editar Cargo' : 'Agregar Nuevo Cargo'}</DialogTitle>
+          <DialogTitle id="dialog-title">{isEditing ? 'Editar Tipo de Documento' : 'Agregar Nuevo Tipo de Documento'}</DialogTitle>
           <DialogContent>
             {errorMessage && (
               <div style={{ color: 'red', marginBottom: '10px' }}>
@@ -508,7 +473,7 @@ const Cargos = () => {
               label="Nombre"
               type="text"
               fullWidth
-              value={currentCargo.nombre}
+              value={currentTipoDocumento.nombre}
               onChange={handleInputChange}
               inputRef={nombreInputRef}
               error={nombreError}
@@ -520,7 +485,7 @@ const Cargos = () => {
               label="Descripción"
               type="text"
               fullWidth
-              value={currentCargo.descripcion}
+              value={currentTipoDocumento.descripcion}
               onChange={handleInputChange}
             />
           </DialogContent>
@@ -538,4 +503,4 @@ const Cargos = () => {
   );
 };
 
-export default Cargos;
+export default TiposDocumentos;
